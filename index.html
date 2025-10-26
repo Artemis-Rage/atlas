@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Coordinate Mapper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            align-self: flex-end;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .content {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-panel {
+            width: 350px;
+            background: #2d2d2d;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #444;
+        }
+
+        .image-container {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+            background: #1a1a1a;
+        }
+
+        #imageCanvas {
+            display: block;
+            cursor: crosshair;
+            transform-origin: 0 0;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        .zoom-controls button {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            font-size: 20px;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            background: #667eea;
+            color: white;
+            border: none;
+        }
+
+        .zoom-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .coordinates-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .coordinates-list h2 {
+            font-size: 14px;
+            color: #888;
+            padding: 15px 20px 10px;
+            margin: 0;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        #coordinatesList {
+            flex: 1;
+            overflow-y: auto;
+            background: #1e1e1e;
+            margin: 0 10px 10px 10px;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .code-block {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #d4d4d4;
+            user-select: all;
+            cursor: text;
+            white-space: pre;
+            line-height: 1.6;
+        }
+
+        .code-block:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px 20px;
+            font-size: 14px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: #2d2d2d;
+            border-top: 1px solid #444;
+        }
+
+        .actions button {
+            flex: 1;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .actions button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .actions button:disabled {
+            background: #3a3a3a;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .clear-button {
+            background: #ff6b6b !important;
+        }
+
+        .clear-button:hover:not(:disabled) {
+            background: #ff5252 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <div class="info-panel">
+                <div class="coordinates-list">
+                    <h2>Route Points</h2>
+                    <div id="coordinatesList" class="empty-state">
+                        Click on the map to add points
+                    </div>
+                </div>
+                <div class="actions">
+                    <button id="undoButton" disabled>Undo</button>
+                    <button id="clearButton" class="clear-button" disabled>Clear</button>
+                </div>
+            </div>
+
+            <div class="image-container" id="imageContainer">
+                <canvas id="imageCanvas"></canvas>
+                <div class="zoom-info" id="zoomInfo">Zoom: 100%</div>
+                <div class="zoom-controls">
+                    <button id="zoomIn" title="Zoom In">+</button>
+                    <button id="zoomOut" title="Zoom Out">−</button>
+                    <button id="resetZoom" title="Reset Zoom">⟲</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class CoordinateMapper {
+            constructor() {
+                this.canvas = document.getElementById('imageCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.container = document.getElementById('imageContainer');
+                this.points = [];
+                this.image = null;
+                this.originX = 187; // mm (bottom-left)
+                this.originY = 8;   // mm (bottom-left)
+                this.topRightX = 2177; // mm
+                this.topRightY = 1142; // mm
+                this.zoom = 1.0;
+                this.minZoom = 0.1;
+                this.maxZoom = 5.0;
+                this.isPanning = false;
+                this.isDragging = false;
+                this.hasDragged = false;
+                this.dragStart = { x: 0, y: 0 };
+                this.panStart = { x: 0, y: 0 };
+                this.scrollStart = { x: 0, y: 0 };
+                
+                this.initializeEventListeners();
+                this.loadDefaultImage();
+            }
+
+            get imageWidthMM() {
+                return this.topRightX - this.originX;
+            }
+
+            get imageHeightMM() {
+                return this.topRightY - this.originY;
+            }
+
+            initializeEventListeners() {
+                // Canvas interactions
+                this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+                this.canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', () => this.handleMouseUp());
+                this.canvas.addEventListener('mouseleave', () => this.handleMouseUp());
+                
+                // Buttons
+                document.getElementById('undoButton').addEventListener('click', () => this.undo());
+                document.getElementById('clearButton').addEventListener('click', () => this.clearAll());
+                document.getElementById('zoomIn').addEventListener('click', () => this.adjustZoom(1.2));
+                document.getElementById('zoomOut').addEventListener('click', () => this.adjustZoom(0.8));
+                document.getElementById('resetZoom').addEventListener('click', () => this.resetZoom());
+            }
+
+            loadDefaultImage() {
+                this.image = new Image();
+                this.image.onload = () => {
+                    this.setupCanvas();
+                    this.redraw();
+                };
+                this.image.onerror = () => {
+                    console.log('Default image not found. Please upload an image.');
+                };
+                this.image.src = 'unearthed_map.png';
+            }
+
+            loadImage(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.image = new Image();
+                    this.image.onload = () => {
+                        this.setupCanvas();
+                        this.resetZoom();
+                    };
+                    this.image.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            setupCanvas() {
+                if (!this.image) return;
+                
+                // Set canvas size to match image
+                this.canvas.width = this.image.width;
+                this.canvas.height = this.image.height;
+                
+                this.applyZoom();
+            }
+
+            applyZoom() {
+                if (!this.image) return;
+                this.canvas.style.width = (this.image.width * this.zoom) + 'px';
+                this.canvas.style.height = (this.image.height * this.zoom) + 'px';
+                document.getElementById('zoomInfo').textContent = `Zoom: ${Math.round(this.zoom * 100)}%`;
+            }
+
+            handleWheel(event) {
+                if (!this.image) return;
+                event.preventDefault();
+                
+                const delta = event.deltaY > 0 ? 0.9 : 1.1;
+                this.adjustZoom(delta);
+            }
+
+            adjustZoom(factor) {
+                if (!this.image) return;
+                
+                const oldZoom = this.zoom;
+                this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoom * factor));
+                
+                if (oldZoom !== this.zoom) {
+                    // Adjust scroll position to zoom towards center
+                    const container = this.container;
+                    const centerX = container.scrollLeft + container.clientWidth / 2;
+                    const centerY = container.scrollTop + container.clientHeight / 2;
+                    
+                    this.applyZoom();
+                    
+                    const newCenterX = centerX * (this.zoom / oldZoom);
+                    const newCenterY = centerY * (this.zoom / oldZoom);
+                    
+                    container.scrollLeft = newCenterX - container.clientWidth / 2;
+                    container.scrollTop = newCenterY - container.clientHeight / 2;
+                }
+            }
+
+            resetZoom() {
+                this.zoom = 1.0;
+                this.applyZoom();
+                this.container.scrollLeft = 0;
+                this.container.scrollTop = 0;
+                this.redraw();
+            }
+
+            handleMouseDown(event) {
+                // Pan with any mouse button drag
+                if (event.button === 0 || event.button === 1 || event.button === 2) {
+                    this.isDragging = true;
+                    this.dragStart = { x: event.clientX, y: event.clientY };
+                    this.dragThreshold = 5; // pixels before we consider it a drag vs click
+                    this.hasDragged = false;
+                }
+            }
+
+            handleMouseMove(event) {
+                if (this.isDragging) {
+                    const dx = this.dragStart.x - event.clientX;
+                    const dy = this.dragStart.y - event.clientY;
+                    
+                    // Check if we've moved enough to be considered a drag
+                    if (!this.hasDragged && (Math.abs(dx) > this.dragThreshold || Math.abs(dy) > this.dragThreshold)) {
+                        this.hasDragged = true;
+                        this.isPanning = true;
+                        this.panStart = { x: this.dragStart.x, y: this.dragStart.y };
+                        this.scrollStart = { 
+                            x: this.container.scrollLeft, 
+                            y: this.container.scrollTop 
+                        };
+                        this.canvas.style.cursor = 'grabbing';
+                        event.preventDefault();
+                    }
+                    
+                    if (this.isPanning) {
+                        this.container.scrollLeft = this.scrollStart.x + dx;
+                        this.container.scrollTop = this.scrollStart.y + dy;
+                    }
+                }
+            }
+
+            handleMouseUp() {
+                this.isDragging = false;
+                if (this.isPanning) {
+                    this.isPanning = false;
+                    this.canvas.style.cursor = 'crosshair';
+                }
+            }
+
+            handleCanvasClick(event) {
+                if (!this.image) return;
+                
+                // Don't add point if we just finished dragging
+                if (this.hasDragged) {
+                    this.hasDragged = false;
+                    return;
+                }
+
+                const rect = this.canvas.getBoundingClientRect();
+                const scaleX = this.canvas.width / rect.width;
+                const scaleY = this.canvas.height / rect.height;
+                
+                const pixelX = (event.clientX - rect.left) * scaleX;
+                const pixelY = (event.clientY - rect.top) * scaleY;
+
+                // Convert pixel coordinates to mm coordinates
+                // Bottom-left is (originX, originY), top-right is (topRightX, topRightY)
+                // 1. Flip Y axis (canvas Y goes down, we want Y to go up)
+                // 2. Scale from pixels to mm
+                // 3. Add origin offset
+                
+                const mmX = this.originX + (pixelX / this.canvas.width) * this.imageWidthMM;
+                const mmY = this.originY + ((this.canvas.height - pixelY) / this.canvas.height) * this.imageHeightMM;
+
+                this.addPoint(pixelX, pixelY, mmX, mmY);
+            }
+
+            addPoint(pixelX, pixelY, mmX, mmY) {
+                this.points.push({ pixelX, pixelY, mmX, mmY });
+                this.updateUI();
+                this.redraw();
+            }
+
+            undo() {
+                if (this.points.length > 0) {
+                    this.points.pop();
+                    this.updateUI();
+                    this.redraw();
+                }
+            }
+
+            clearAll() {
+                this.points = [];
+                this.updateUI();
+                this.redraw();
+            }
+
+            redraw() {
+                if (!this.image) return;
+
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Draw image
+                this.ctx.drawImage(this.image, 0, 0);
+
+                // Draw route
+                if (this.points.length > 0) {
+                    // Draw lines connecting points
+                    this.ctx.strokeStyle = '#667eea';
+                    this.ctx.lineWidth = 4;
+                    this.ctx.setLineDash([]);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.points[0].pixelX, this.points[0].pixelY);
+                    for (let i = 1; i < this.points.length; i++) {
+                        this.ctx.lineTo(this.points[i].pixelX, this.points[i].pixelY);
+                    }
+                    this.ctx.stroke();
+
+                    // Draw points
+                    this.points.forEach((point, index) => {
+                        // Outer circle (white border)
+                        this.ctx.fillStyle = 'white';
+                        this.ctx.beginPath();
+                        this.ctx.arc(point.pixelX, point.pixelY, 10, 0, 2 * Math.PI);
+                        this.ctx.fill();
+
+                        // Inner circle (colored)
+                        this.ctx.fillStyle = '#667eea';
+                        this.ctx.beginPath();
+                        this.ctx.arc(point.pixelX, point.pixelY, 8, 0, 2 * Math.PI);
+                        this.ctx.fill();
+
+                        // Draw point number
+                        this.ctx.fillStyle = 'white';
+                        this.ctx.font = 'bold 11px Arial';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        this.ctx.fillText((index + 1).toString(), point.pixelX, point.pixelY);
+                    });
+                }
+            }
+
+            updateUI() {
+                const list = document.getElementById('coordinatesList');
+                const undoButton = document.getElementById('undoButton');
+                const clearButton = document.getElementById('clearButton');
+
+                if (this.points.length === 0) {
+                    list.innerHTML = '<div class="empty-state">Click on the map to add points</div>';
+                    undoButton.disabled = true;
+                    clearButton.disabled = true;
+                } else {
+                    undoButton.disabled = false;
+                    clearButton.disabled = false;
+                    
+                    // Format as Python list
+                    const pointsStr = this.points.map((point, index) => {
+                        const x = point.mmX.toFixed(2);
+                        const y = point.mmY.toFixed(2);
+                        const comma = index < this.points.length - 1 ? ',' : '';
+                        return `  [${x}, ${y}]${comma}`;
+                    }).join('\n');
+                    
+                    list.innerHTML = `<div class="code-block" title="Click to select all">points = [\n${pointsStr}\n]</div>`;
+                }
+            }
+        }
+
+        // Initialize the application
+        const mapper = new CoordinateMapper();
+    </script>
+</body>
+</html>
+

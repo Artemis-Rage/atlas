@@ -1,0 +1,12 @@
+[workspace]
+authors = ["ctrl-k <jamie.a.smith@gmail.com>"]
+channels = ["conda-forge"]
+name = "atlas"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+serve = "python -m http.server 8000"
+
+[dependencies]
+python = ">=3.8"
